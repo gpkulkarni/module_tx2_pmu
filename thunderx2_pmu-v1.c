@@ -396,7 +396,7 @@ static bool tx2_uncore_validate_event_group(struct perf_event *event)
 	if (!tx2_uncore_validate_event(event->pmu, leader, &counters))
 		return false;
 
-	for_each_sibling_event(sibling, leader) {
+	list_for_each_entry(sibling, &leader->sibling_list, group_entry) {
 		if (!tx2_uncore_validate_event(event->pmu, sibling, &counters))
 			return false;
 	}
@@ -603,10 +603,6 @@ static int tx2_uncore_pmu_add_dev(struct tx2_uncore_pmu *tx2_pmu)
 		return -ENODEV;
 	}
 
-	/* register hotplug callback for the pmu */
-	ret = cpuhp_state_add_instance(
-			CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE,
-			&tx2_pmu->hpnode);
 	if (ret) {
 		dev_err(tx2_pmu->dev, "Error %d registering hotplug", ret);
 		return ret;
@@ -727,52 +723,6 @@ static acpi_status tx2_uncore_pmu_add(acpi_handle handle, u32 level,
 	return AE_OK;
 }
 
-static int tx2_uncore_pmu_online_cpu(unsigned int cpu,
-		struct hlist_node *hpnode)
-{
-	struct tx2_uncore_pmu *tx2_pmu;
-
-	tx2_pmu = hlist_entry_safe(hpnode,
-			struct tx2_uncore_pmu, hpnode);
-
-	/* Pick this CPU, If there is no CPU/PMU association and both are
-	 * from same node.
-	 */
-	if ((tx2_pmu->cpu >= nr_cpu_ids) &&
-		(tx2_pmu->node == cpu_to_node(cpu)))
-		tx2_pmu->cpu = cpu;
-
-	return 0;
-}
-
-static int tx2_uncore_pmu_offline_cpu(unsigned int cpu,
-		struct hlist_node *hpnode)
-{
-	int new_cpu;
-	struct tx2_uncore_pmu *tx2_pmu;
-	struct cpumask cpu_online_mask_temp;
-
-	tx2_pmu = hlist_entry_safe(hpnode,
-			struct tx2_uncore_pmu, hpnode);
-
-	if (cpu != tx2_pmu->cpu)
-		return 0;
-
-	hrtimer_cancel(&tx2_pmu->hrtimer);
-	cpumask_copy(&cpu_online_mask_temp, cpu_online_mask);
-	cpumask_clear_cpu(cpu, &cpu_online_mask_temp);
-	new_cpu = cpumask_any_and(
-			cpumask_of_node(tx2_pmu->node),
-			&cpu_online_mask_temp);
-
-	tx2_pmu->cpu = new_cpu;
-	if (new_cpu >= nr_cpu_ids)
-		return 0;
-	perf_pmu_migrate_context(&tx2_pmu->pmu, cpu, new_cpu);
-
-	return 0;
-}
-
 static const struct acpi_device_id tx2_uncore_acpi_match[] = {
 	{"CAV901C", 0},
 	{},
@@ -815,9 +765,6 @@ static int tx2_uncore_remove(struct platform_device *pdev)
 	if (!list_empty(&tx2_pmus)) {
 		list_for_each_entry_safe(tx2_pmu, temp, &tx2_pmus, entry) {
 			if (tx2_pmu->node == dev_to_node(dev)) {
-				cpuhp_state_remove_instance_nocalls(
-					CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE,
-					&tx2_pmu->hpnode);
 				perf_pmu_unregister(&tx2_pmu->pmu);
 				list_del(&tx2_pmu->entry);
 			}
@@ -837,28 +784,13 @@ static struct platform_driver tx2_uncore_driver = {
 
 static int __init tx2_uncore_driver_init(void)
 {
-	int ret;
-
-	ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE,
-				      "perf/tx2/uncore:online",
-				      tx2_uncore_pmu_online_cpu,
-				      tx2_uncore_pmu_offline_cpu);
-	if (ret) {
-		pr_err("TX2 PMU: setup hotplug failed(%d)\n", ret);
-		return ret;
-	}
-	ret = platform_driver_register(&tx2_uncore_driver);
-	if (ret)
-		cpuhp_remove_multi_state(CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE);
-
-	return ret;
+	return platform_driver_register(&tx2_uncore_driver);
 }
 module_init(tx2_uncore_driver_init);
 
 static void __exit tx2_uncore_driver_exit(void)
 {
 	platform_driver_unregister(&tx2_uncore_driver);
-	cpuhp_remove_multi_state(CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE);
 }
 module_exit(tx2_uncore_driver_exit);
 
