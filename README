@@ -9,8 +9,8 @@ Module load/remove(4.16 and below):
 	rmmod thunderx2_pmu-v1.ko
 
 Module load/remove.
-	insmod thunderx2_pmu-v1.ko
-	rmmod thunderx2_pmu-v1.ko
+	insmod thunderx2_pmu.ko
+	rmmod thunderx2_pmu.ko
 
 Refer thunderx2-pmu.txt for ThunderX2 UNCORE feature description.
 
