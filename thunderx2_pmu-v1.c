@@ -48,6 +48,15 @@
 #define DMC_EVENT_READ_TXNS		0xF
 #define DMC_EVENT_MAX			0x10
 
+//#define EXPORT_HACK
+
+#ifdef  EXPORT_HACK
+void (*perf_event_update_userpage_hack)(struct perf_event *event) = 0xdeadbeef;
+#define perf_event_update_userpage_local  perf_event_update_userpage_hack
+#else
+#define perf_event_update_userpage_local perf_event_update_userpage
+#endif
+
 enum tx2_uncore_type {
 	PMU_TYPE_L3C,
 	PMU_TYPE_DMC,
@@ -464,7 +473,7 @@ static void tx2_uncore_event_start(struct perf_event *event, int flags)
 	tx2_pmu = pmu_to_tx2_pmu(event->pmu);
 
 	tx2_pmu->start_event(event, flags);
-	perf_event_update_userpage(event);
+	perf_event_update_userpage_local(event);
 
 	/* Start timer for first event */
 	if (bitmap_weight(tx2_pmu->active_counters,
@@ -526,7 +535,7 @@ static void tx2_uncore_event_del(struct perf_event *event, int flags)
 	/* clear the assigned counter */
 	free_counter(tx2_pmu, GET_COUNTERID(event));
 
-	perf_event_update_userpage(event);
+	perf_event_update_userpage_local(event);
 	tx2_pmu->events[hwc->idx] = NULL;
 	hwc->idx = -1;
 }
