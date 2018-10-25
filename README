@@ -1,0 +1,27 @@
+
+Build For latest kernel:
+	make
+For 4.16 and below:
+	make VERSION=-v1
+
+Module load/remove(4.16 and below):
+	insmod thunderx2_pmu-v1.ko
+	rmmod thunderx2_pmu-v1.ko
+
+Module load/remove.
+	insmod thunderx2_pmu-v1.ko
+	rmmod thunderx2_pmu-v1.ko
+
+Refer thunderx2-pmu.txt for ThunderX2 UNCORE feature description.
+
+NOTE:
+thunderx2_pmu.c is a copy of PATCH v7 sent to mailing list.
+thunderx2_pmu-v1.c is a copy of thunderx2_pmu.c with changes to port for
+distro kernel versions.
+
+The Changes are,
+- Removed hotplug support, since it has header dependency.
+- modified thunderx2_uncore_validate_event_group to compile with older kernels.
+
+
+
