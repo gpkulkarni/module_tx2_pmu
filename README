@@ -23,18 +23,3 @@ The Changes are,
 - Removed hotplug support, since it has header dependency.
 - modified thunderx2_uncore_validate_event_group to compile with older kernels.
 
-IF your DISTRO dont have patch,
-82975c46da82 perf: Export perf_event_update_userpage
-
-Follow below hack:
-	1. get the function address of perf_event_update_userpage with below command.
-		cat /proc/kallsyms | grep perf_event_update_userpage
-
-	2. Edit thunderx2_pmu-v1.c to,
-		uncomment EXPORT_HACK
-		replace 0xdeadbeef from address got from step 1.
-
-	3. Compile module.
-		make VERSION=-v1
-
-

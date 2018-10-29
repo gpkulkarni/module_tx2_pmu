@@ -48,10 +48,8 @@
 #define DMC_EVENT_READ_TXNS		0xF
 #define DMC_EVENT_MAX			0x10
 
-//#define EXPORT_HACK
-
-#ifdef  EXPORT_HACK
-void (*perf_event_update_userpage_hack)(struct perf_event *event) = 0xdeadbeef;
+#if (EXPORT_HACK!=1)
+void (*perf_event_update_userpage_hack)(struct perf_event *event) = EXPORT_HACK;
 #define perf_event_update_userpage_local  perf_event_update_userpage_hack
 #else
 #define perf_event_update_userpage_local perf_event_update_userpage
