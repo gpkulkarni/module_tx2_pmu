@@ -21,8 +21,11 @@
 #define TX2_PMU_L3_TILES		16
 
 #define TX2_PMU_HRTIMER_INTERVAL	(2 * NSEC_PER_SEC)
-#define GET_EVENTID(ev)			((ev->hw.config) & 0x1ff)
-#define GET_COUNTERID(ev)		((ev->hw.idx) & 0xf)
+#define GET_EVENTID(ev)			((ev->hw.config) & 0x1f)
+#define GET_COUNTERID(ev)		((ev->hw.idx) & 0x3)
+ /* 1 byte per counter(4 counters).
+  * Event id is encoded in bits [5:1] of a byte,
+  */
 #define DMC_EVENT_CFG(idx, val)		((val) << (((idx) * 8) + 1))
 
 #define L3C_COUNTER_CTL			0xA8
@@ -72,9 +75,9 @@ struct tx2_uncore_pmu {
 	char *name;
 	int node;
 	int cpu;
-	u32    max_counters;
-	u32    prorate_factor;
-	u32    max_events;
+	u32 max_counters;
+	u32 prorate_factor;
+	u32 max_events;
 	u64 hrtimer_interval;
 	void __iomem *base;
 	DECLARE_BITMAP(active_counters, TX2_PMU_MAX_COUNTERS);
@@ -83,11 +86,10 @@ struct tx2_uncore_pmu {
 	struct hrtimer hrtimer;
 	const struct attribute_group **attr_groups;
 	enum tx2_uncore_type type;
-	raw_spinlock_t lock;
-	void	(*init_cntr_base)(struct perf_event *event,
+	void (*init_cntr_base)(struct perf_event *event,
 			struct tx2_uncore_pmu *tx2_pmu);
-	void	(*stop_event)(struct perf_event *event);
-	void	(*start_event)(struct perf_event *event, int flags);
+	void (*stop_event)(struct perf_event *event);
+	void (*start_event)(struct perf_event *event, int flags);
 };
 
 static LIST_HEAD(tx2_pmus);
@@ -97,33 +99,15 @@ static inline struct tx2_uncore_pmu *pmu_to_tx2_pmu(struct pmu *pmu)
 	return container_of(pmu, struct tx2_uncore_pmu, pmu);
 }
 
-/*
- * sysfs format attributes
- */
-static ssize_t tx2_pmu_format_show(struct device *dev,
-				     struct device_attribute *attr, char *buf)
-{
-	struct dev_ext_attribute *eattr;
-
-	eattr = container_of(attr, struct dev_ext_attribute, attr);
-	return sprintf(buf, "%s\n", (char *) eattr->var);
-}
-
-#define FORMAT_ATTR(_name, _config) \
-	(&((struct dev_ext_attribute[]) { \
-	   { \
-	   .attr = __ATTR(_name, 0444, tx2_pmu_format_show, NULL), \
-	   .var = (void *) _config, \
-	   } \
-	})[0].attr.attr)
+PMU_FORMAT_ATTR(event,	"config:0-4");
 
 static struct attribute *l3c_pmu_format_attrs[] = {
-	FORMAT_ATTR(event,	"config:0-4"),
+	&format_attr_event.attr,
 	NULL,
 };
 
 static struct attribute *dmc_pmu_format_attrs[] = {
-	FORMAT_ATTR(event,	"config:0-4"),
+	&format_attr_event.attr,
 	NULL,
 };
 
@@ -146,34 +130,44 @@ static ssize_t tx2_pmu_event_show(struct device *dev,
 	struct dev_ext_attribute *eattr;
 
 	eattr = container_of(attr, struct dev_ext_attribute, attr);
-	return sprintf(buf, "config=0x%lx\n", (unsigned long) eattr->var);
+	return sprintf(buf, "event=0x%lx\n", (unsigned long) eattr->var);
 }
 
-#define EVENT_ATTR(_name, _config) \
-	(&((struct dev_ext_attribute[]) { \
-	   { \
-	   .attr = __ATTR(_name, 0444, tx2_pmu_event_show, NULL), \
-	   .var = (void *) _config, \
-	   } \
-	 })[0].attr.attr)
+#define TX2_EVENT_ATTR(name, config) \
+	PMU_EVENT_ATTR(name, tx2_pmu_event_attr_##name, \
+			config, tx2_pmu_event_show)
+
+TX2_EVENT_ATTR(read_request, L3_EVENT_READ_REQ);
+TX2_EVENT_ATTR(writeback_request, L3_EVENT_WRITEBACK_REQ);
+TX2_EVENT_ATTR(inv_nwrite_request, L3_EVENT_INV_N_WRITE_REQ);
+TX2_EVENT_ATTR(inv_request, L3_EVENT_INV_REQ);
+TX2_EVENT_ATTR(evict_request, L3_EVENT_EVICT_REQ);
+TX2_EVENT_ATTR(inv_nwrite_hit, L3_EVENT_INV_N_WRITE_HIT);
+TX2_EVENT_ATTR(inv_hit, L3_EVENT_INV_HIT);
+TX2_EVENT_ATTR(read_hit, L3_EVENT_READ_HIT);
 
 static struct attribute *l3c_pmu_events_attrs[] = {
-	EVENT_ATTR(read_request,		L3_EVENT_READ_REQ),
-	EVENT_ATTR(writeback_request,		L3_EVENT_WRITEBACK_REQ),
-	EVENT_ATTR(inv_nwrite_request,		L3_EVENT_INV_N_WRITE_REQ),
-	EVENT_ATTR(inv_request,			L3_EVENT_INV_REQ),
-	EVENT_ATTR(evict_request,		L3_EVENT_EVICT_REQ),
-	EVENT_ATTR(inv_nwrite_hit,		L3_EVENT_INV_N_WRITE_HIT),
-	EVENT_ATTR(inv_hit,			L3_EVENT_INV_HIT),
-	EVENT_ATTR(read_hit,			L3_EVENT_READ_HIT),
+	&tx2_pmu_event_attr_read_request.attr.attr,
+	&tx2_pmu_event_attr_writeback_request.attr.attr,
+	&tx2_pmu_event_attr_inv_nwrite_request.attr.attr,
+	&tx2_pmu_event_attr_inv_request.attr.attr,
+	&tx2_pmu_event_attr_evict_request.attr.attr,
+	&tx2_pmu_event_attr_inv_nwrite_hit.attr.attr,
+	&tx2_pmu_event_attr_inv_hit.attr.attr,
+	&tx2_pmu_event_attr_read_hit.attr.attr,
 	NULL,
 };
 
+TX2_EVENT_ATTR(cnt_cycles, DMC_EVENT_COUNT_CYCLES);
+TX2_EVENT_ATTR(write_txns, DMC_EVENT_WRITE_TXNS);
+TX2_EVENT_ATTR(data_transfers, DMC_EVENT_DATA_TRANSFERS);
+TX2_EVENT_ATTR(read_txns, DMC_EVENT_READ_TXNS);
+
 static struct attribute *dmc_pmu_events_attrs[] = {
-	EVENT_ATTR(cnt_cycles,			DMC_EVENT_COUNT_CYCLES),
-	EVENT_ATTR(write_txns,			DMC_EVENT_WRITE_TXNS),
-	EVENT_ATTR(data_transfers,		DMC_EVENT_DATA_TRANSFERS),
-	EVENT_ATTR(read_txns,			DMC_EVENT_READ_TXNS),
+	&tx2_pmu_event_attr_cnt_cycles.attr.attr,
+	&tx2_pmu_event_attr_write_txns.attr.attr,
+	&tx2_pmu_event_attr_data_transfers.attr.attr,
+	&tx2_pmu_event_attr_read_txns.attr.attr,
 	NULL,
 };
 
@@ -190,8 +184,8 @@ static const struct attribute_group dmc_pmu_events_attr_group = {
 /*
  * sysfs cpumask attributes
  */
-static ssize_t cpumask_show(struct device *dev, struct device_attribute
-		*attr, char *buf)
+static ssize_t cpumask_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
 {
 	struct tx2_uncore_pmu *tx2_pmu;
 
@@ -331,7 +325,7 @@ static void tx2_uncore_event_update(struct perf_event *event)
 	struct hw_perf_event *hwc = &event->hw;
 	struct tx2_uncore_pmu *tx2_pmu;
 	enum tx2_uncore_type type;
-	u32    prorate_factor;
+	u32 prorate_factor;
 
 	tx2_pmu = pmu_to_tx2_pmu(event->pmu);
 	type = tx2_pmu->type;
@@ -355,7 +349,7 @@ static void tx2_uncore_event_update(struct perf_event *event)
 	local64_add(delta * prorate_factor, &event->count);
 }
 
-enum tx2_uncore_type get_tx2_pmu_type(struct acpi_device *adev)
+static enum tx2_uncore_type get_tx2_pmu_type(struct acpi_device *adev)
 {
 	int i = 0;
 	struct acpi_tx2_pmu_device {
@@ -369,10 +363,11 @@ enum tx2_uncore_type get_tx2_pmu_type(struct acpi_device *adev)
 
 	while (devices[i].type != PMU_TYPE_INVALID) {
 		if (!strcmp(acpi_device_hid(adev), devices[i].id))
-			return devices[i].type;
+			break;
 		i++;
 	}
-	return PMU_TYPE_INVALID;
+
+	return devices[i].type;
 }
 
 static bool tx2_uncore_validate_event(struct pmu *pmu,
@@ -385,7 +380,7 @@ static bool tx2_uncore_validate_event(struct pmu *pmu,
 		return false;
 
 	*counters = *counters + 1;
-		return true;
+	return true;
 }
 
 /*
@@ -436,9 +431,13 @@ static int tx2_uncore_event_init(struct perf_event *event)
 	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
 		return -EINVAL;
 
-	/* SOC counters do not have usr/os/guest/host bits */
-	if (event->attr.exclude_user || event->attr.exclude_kernel ||
-	    event->attr.exclude_host || event->attr.exclude_guest)
+	/* We have no filtering of any kind */
+	if (event->attr.exclude_user	||
+	    event->attr.exclude_kernel	||
+	    event->attr.exclude_hv	||
+	    event->attr.exclude_idle	||
+	    event->attr.exclude_host	||
+	    event->attr.exclude_guest)
 		return -EINVAL;
 
 	if (event->cpu < 0)
@@ -547,7 +546,6 @@ static enum hrtimer_restart tx2_hrtimer_callback(struct hrtimer *timer)
 {
 	struct tx2_uncore_pmu *tx2_pmu;
 	int max_counters, idx;
-	unsigned long irqflags;
 
 	tx2_pmu = container_of(timer, struct tx2_uncore_pmu, hrtimer);
 	max_counters = tx2_pmu->max_counters;
@@ -555,14 +553,11 @@ static enum hrtimer_restart tx2_hrtimer_callback(struct hrtimer *timer)
 	if (bitmap_empty(tx2_pmu->active_counters, max_counters))
 		return HRTIMER_NORESTART;
 
-	raw_spin_lock_irqsave(&tx2_pmu->lock, irqflags);
-
 	for_each_set_bit(idx, tx2_pmu->active_counters, max_counters) {
 		struct perf_event *event = tx2_pmu->events[idx];
 
 		tx2_uncore_event_update(event);
 	}
-	raw_spin_unlock_irqrestore(&tx2_pmu->lock, irqflags);
 	hrtimer_forward_now(timer, ns_to_ktime(tx2_pmu->hrtimer_interval));
 	return HRTIMER_RESTART;
 }
@@ -666,7 +661,6 @@ static struct tx2_uncore_pmu *tx2_uncore_pmu_init_dev(struct device *dev,
 	tx2_pmu->base = base;
 	tx2_pmu->node = dev_to_node(dev);
 	INIT_LIST_HEAD(&tx2_pmu->entry);
-	raw_spin_lock_init(&tx2_pmu->lock);
 
 	switch (tx2_pmu->type) {
 	case PMU_TYPE_L3C:
@@ -791,7 +785,10 @@ static struct platform_driver tx2_uncore_driver = {
 
 static int __init tx2_uncore_driver_init(void)
 {
-	return platform_driver_register(&tx2_uncore_driver);
+	int ret;
+
+	ret = platform_driver_register(&tx2_uncore_driver);
+	return ret;
 }
 module_init(tx2_uncore_driver_init);
 
