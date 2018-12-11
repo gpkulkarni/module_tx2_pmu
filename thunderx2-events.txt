@@ -1,0 +1,70 @@
+
+L3C events:
+============
+
+read_request:
+	Number of Read requests received by the L3 Cache.
+	This includes Read as well as Read Exclusives.
+
+read_hit:
+	Number of Read requests received by the L3 cache that were hit
+	in the L3 (Data provided form the L3)
+
+writeback_request:
+	Number of Write Backs received by the L3 Cache. These are basically
+	the L2 Evicts and writes from the PCIe Write Cache.
+
+inv_nwrite_request:
+	Number of Invalidate and Write requests received by the L3 Cache.
+	Also Writes from IO that did not go through the PCIe Write Cache.
+
+inv_nwrite_hit
+	Number of Invalidate and Write requests received by the L3 Cache
+	that were a hit in the L3 Cache.
+
+inv_request:
+	Number of Invalidate requests received by the L3 Cache.
+
+inv_hit:
+	Number of Invalidate requests received by the L3 Cache that were a
+	hit in the L3 Cache.
+
+evict_request:
+	Number of Evicts that the L3 cache generated.
+
+NOTE:
+1. Granularity of all these event counter values are cache line length(64 bytes)
+2. L3C cache Hit Ratio = (read_hit + inv_nwrite_hit + inv_hit) / (read_request + inv_nwrite_request + inv_request)
+
+DMC events:
+============
+cnt_cycles:
+	Count cycles (Clocks at the DMC clock rate)
+
+write_txns:
+	Number of 64 Bytes write transactions received by the DMC(s)
+
+read_txns:
+	Number of 64 Bytes Read transactions received by the DMC(s)
+
+data_transfers:
+	Number of 64 Bytes data transferred to or from DRAM.
+
+
+Examples:
+
+perf stat -a -e uncore_dmc_0/cnt_cycles/ sleep 1
+
+perf stat -a -e \
+uncore_dmc_0/cnt_cycles/,\
+uncore_dmc_0/data_transfers/,\
+uncore_dmc_0/read_txns/,\
+uncore_dmc_0/write_txns/ sleep 1
+
+perf stat -a -e \
+uncore_l3c_0/read_request/,\
+uncore_l3c_0/read_hit/,\
+uncore_l3c_0/inv_request/,\
+uncore_l3c_0/inv_hit/ sleep 1
+
+
