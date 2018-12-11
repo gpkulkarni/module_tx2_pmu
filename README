@@ -15,7 +15,7 @@ Module load/remove.
 Refer thunderx2-pmu.txt for ThunderX2 UNCORE feature description.
 
 NOTE:
-thunderx2_pmu.c is a copy of PATCH v7 sent to mailing list.
+thunderx2_pmu.c is a copy of upstream version.
 thunderx2_pmu-v1.c is a copy of thunderx2_pmu.c with changes to port for
 distro kernel versions.
 
