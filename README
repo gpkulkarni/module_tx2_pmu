@@ -23,3 +23,7 @@ The Changes are,
 - Removed hotplug support, since it has header dependency.
 - modified thunderx2_uncore_validate_event_group to compile with older kernels.
 
+
+************************************* NOTE **************************************
+* For driver VERSION=-v1, make sure you compile module again after every reboot *
+*********************************************************************************
