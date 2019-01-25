@@ -9,6 +9,7 @@
 #include <linux/cpuhotplug.h>
 #include <linux/perf_event.h>
 #include <linux/platform_device.h>
+#include <linux/kallsyms.h>
 
 /* Each ThunderX2(TX2) Socket has a L3C and DMC UNCORE PMU device.
  * Each UNCORE PMU device consists of 4 independent programmable counters.
@@ -51,12 +52,7 @@
 #define DMC_EVENT_READ_TXNS		0xF
 #define DMC_EVENT_MAX			0x10
 
-#if (EXPORT_HACK!=1)
-void (*perf_event_update_userpage_hack)(struct perf_event *event) = EXPORT_HACK;
-#define perf_event_update_userpage_local  perf_event_update_userpage_hack
-#else
-#define perf_event_update_userpage_local perf_event_update_userpage
-#endif
+static void (*perf_event_update_userpage_local)(struct perf_event *event);
 
 enum tx2_uncore_type {
 	PMU_TYPE_L3C,
@@ -786,10 +782,20 @@ static struct platform_driver tx2_uncore_driver = {
 static int __init tx2_uncore_driver_init(void)
 {
 	int ret;
+	unsigned long addr;
+
+	addr = kallsyms_lookup_name("perf_event_update_userpage");
+
+	if (!addr) {
+		pr_err("Unable to find Symbol(%lx)\n", addr);
+		return -1;
+	}
+	perf_event_update_userpage_local = (void *)addr;
 
 	ret = platform_driver_register(&tx2_uncore_driver);
 	return ret;
 }
+
 module_init(tx2_uncore_driver_init);
 
 static void __exit tx2_uncore_driver_exit(void)
