@@ -51,6 +51,25 @@ data_transfers:
 	Number of 64 Bytes data transferred to or from DRAM.
 
 
+CCPI2 events:
+=================
+req_pktsent:
+	Number of Requests packets that are sent form this node. A Request
+	packet can contain one or two requests of any type. Some examples of
+	requests types are, Reads, Read Exclusive, Writes and Evicts.
+
+snoop_pktsent:
+	Number of Snoops (coherency) packets that are sent from this node. A snoop
+	packet can contain one or two snoops.
+
+data_pktsent:
+	Number of Data packets that are sent from this node. Data packet can be any
+	size, but in general they are 64 bytes.
+
+gic_pktsent:
+	Number of Gic(interrupt related) packets that are sent from this node.
+
+
 Examples:
 
 perf stat -a -e uncore_dmc_0/cnt_cycles/ sleep 1
