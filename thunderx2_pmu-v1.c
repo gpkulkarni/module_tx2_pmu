@@ -42,16 +42,10 @@
 #define CCPI2_COUNTER_DATA_H		0x4
 #define CCPI2_COUNTER_SEL		0x2c
 
-
-
 /* L3C event IDs */
 #define L3_EVENT_READ_REQ		0xD
 #define L3_EVENT_WRITEBACK_REQ		0xE
-#define L3_EVENT_INV_N_WRITE_REQ	0xF
-#define L3_EVENT_INV_REQ		0x10
 #define L3_EVENT_EVICT_REQ		0x13
-#define L3_EVENT_INV_N_WRITE_HIT	0x14
-#define L3_EVENT_INV_HIT		0x15
 #define L3_EVENT_READ_HIT		0x17
 #define L3_EVENT_MAX			0x18
 
@@ -162,21 +156,13 @@ static ssize_t tx2_pmu_event_show(struct device *dev,
 
 TX2_EVENT_ATTR(read_request, L3_EVENT_READ_REQ);
 TX2_EVENT_ATTR(writeback_request, L3_EVENT_WRITEBACK_REQ);
-TX2_EVENT_ATTR(inv_nwrite_request, L3_EVENT_INV_N_WRITE_REQ);
-TX2_EVENT_ATTR(inv_request, L3_EVENT_INV_REQ);
 TX2_EVENT_ATTR(evict_request, L3_EVENT_EVICT_REQ);
-TX2_EVENT_ATTR(inv_nwrite_hit, L3_EVENT_INV_N_WRITE_HIT);
-TX2_EVENT_ATTR(inv_hit, L3_EVENT_INV_HIT);
 TX2_EVENT_ATTR(read_hit, L3_EVENT_READ_HIT);
 
 static struct attribute *l3c_pmu_events_attrs[] = {
 	&tx2_pmu_event_attr_read_request.attr.attr,
 	&tx2_pmu_event_attr_writeback_request.attr.attr,
-	&tx2_pmu_event_attr_inv_nwrite_request.attr.attr,
-	&tx2_pmu_event_attr_inv_request.attr.attr,
 	&tx2_pmu_event_attr_evict_request.attr.attr,
-	&tx2_pmu_event_attr_inv_nwrite_hit.attr.attr,
-	&tx2_pmu_event_attr_inv_hit.attr.attr,
 	&tx2_pmu_event_attr_read_hit.attr.attr,
 	NULL,
 };
