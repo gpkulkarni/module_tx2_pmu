@@ -14,21 +14,6 @@ writeback_request:
 	Number of Write Backs received by the L3 Cache. These are basically
 	the L2 Evicts and writes from the PCIe Write Cache.
 
-inv_nwrite_request:
-	Number of Invalidate and Write requests received by the L3 Cache.
-	Also Writes from IO that did not go through the PCIe Write Cache.
-
-inv_nwrite_hit
-	Number of Invalidate and Write requests received by the L3 Cache
-	that were a hit in the L3 Cache.
-
-inv_request:
-	Number of Invalidate requests received by the L3 Cache.
-
-inv_hit:
-	Number of Invalidate requests received by the L3 Cache that were a
-	hit in the L3 Cache.
-
 evict_request:
 	Number of Evicts that the L3 cache generated.
 
