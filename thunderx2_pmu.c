@@ -82,6 +82,7 @@ struct tx2_uncore_pmu {
 	int node;
 	int cpu;
 	u32 max_counters;
+	bool events_mux_disable;
 	u32 prorate_factor;
 	u32 max_events;
 	u64 hrtimer_interval;
@@ -562,6 +563,8 @@ static int tx2_uncore_event_init(struct perf_event *event)
 	if (!tx2_uncore_validate_event_group(event))
 		return -EINVAL;
 
+	/* reset flag */
+	tx2_pmu->events_mux_disable = false;
 	return 0;
 }
 
@@ -610,10 +613,19 @@ static int tx2_uncore_event_add(struct perf_event *event, int flags)
 
 	tx2_pmu = pmu_to_tx2_pmu(event->pmu);
 
+	/* Erratum ThunderX2errata-221.
+	 * Disable support for events multiplexing.
+	 * Limiting the number of events to available hardware counters.
+	 */
+	if (tx2_pmu->events_mux_disable)
+		return -EOPNOTSUPP;
+
 	/* Allocate a free counter */
 	hwc->idx  = alloc_counter(tx2_pmu);
-	if (hwc->idx < 0)
+	if (hwc->idx < 0) {
+		tx2_pmu->events_mux_disable = true;
 		return -EAGAIN;
+	}
 
 	tx2_pmu->events[hwc->idx] = event;
 	/* set counter control and data registers base address */
@@ -763,6 +775,7 @@ static struct tx2_uncore_pmu *tx2_uncore_pmu_init_dev(struct device *dev,
 	tx2_pmu->dev = dev;
 	tx2_pmu->type = type;
 	tx2_pmu->base = base;
+	tx2_pmu->events_mux_disable = false;
 	tx2_pmu->node = dev_to_node(dev);
 	INIT_LIST_HEAD(&tx2_pmu->entry);
 
